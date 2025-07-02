@@ -114,4 +114,14 @@ void clahe(const uint8_t * const *grayscale_photo, int width, int height, const 
           const int tile_size, int ***equalized_image);
 void blend_with_original(int **equalized, const uint8_t * const *original, 
                         int width, int height, float clahe_strength);
+void free_matrix(void** matrix, const int dim);
+double** createGaussianKernel(double sigma, int* size_out);
+void convolve(int width, int height, double **image, double ***convoluted, int kernel_size_half, double **kernel);
+void gradient_double(double **image, double ***grad_x, double ***grad_y, int width, int height);
+void gradient_magnitude_double(double **grad_x, double **grad_y, double ***magnitude, int width, int height);
+void edge_stopping_function_double(double **mag, double ***g, int width, int height);
+void compute_curvature(double **phi, double ***curvature, int width, int height);
+void reinitialize_level_set(double **phi, int width, int height);
+void geodesic_level_set_contour(int **image, double ***phi_final, int width, int height, 
+                               double sigma, double nu, double dt, int N);
 #endif
