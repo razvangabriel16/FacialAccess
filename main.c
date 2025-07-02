@@ -53,8 +53,8 @@ int main(void) {
 
     int **equalized = (int **)malloc_matrix(640, 480, sizeof(int));
     DIE(!equalized, "malloc failed");
-`   clahe(grayscale_photo, 640, 480, 3 , 64, &equalized);
-    blend_with_original(equalized, grayscale_photo, 640, 480, 0.5f);
+    clahe(grayscale_photo, 640, 480, 3 , 64, &equalized);
+    blend_with_original(equalized, grayscale_photo, 640, 480, 0.2f);
     FILE* g = fopen("equalized.pgm", "wb");
     fprintf(g, "P5\n%d %d\n255\n", 640, 480);
     for(int i = 0; i < 480; ++i) {
@@ -72,8 +72,8 @@ int main(void) {
 fclose(g);
      //haar cascades part
     //system("chmod +x /home/pi/project2/haar_select.py");
-    //int ret = system("python3 /home/pi/project2/haar_select.py /home/pi/project2/imagine.pgm");
-    //DIE(ret == -1, "python script failed");
+    int ret = system("python3 /home/pi/project2/haar_select.py /home/pi/project2/equalized.pgm");
+    DIE(ret == -1, "python script failed");
     
 
     
