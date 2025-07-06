@@ -10,7 +10,6 @@ def main():
     image_path = '/pi/home/project2/imagine_contour.pgm'
     img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
     if img is None:
-        print(f"Error: Could not read image from {image_path}")
         return None
     lib = ctypes.CDLL('./libinvert.so')
     height, width = img.shape
