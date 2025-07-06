@@ -124,4 +124,9 @@ void compute_curvature(double **phi, double ***curvature, int width, int height)
 void reinitialize_level_set(double **phi, int width, int height);
 void geodesic_level_set_contour(int **image, double ***phi_final, int width, int height, 
                                double sigma, double nu, double dt, int N);
+double compute_curvature_at_point(double **phi, int x, int y, int width, int height);
+void compute_gradient_at_point(double **phi, int x, int y, int width, int height, double *grad_x, double* grad_y);
+void pure_balloon_model(int **image, double ***phi_final, int width, int height, 
+                       double nu, double dt, int N);
+
 #endif
