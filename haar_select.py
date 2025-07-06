@@ -26,13 +26,12 @@ def initialize_phi_mask(face_img):
     return phi
 
 
-def find_face(path, padding=20, input_size=112):
+def find_face(path, padding=20, input_size=112, yuyv_original_photo = '/home/pi/project2/output.yuv'):
     output_dir = "faces"
     os.makedirs(output_dir, exist_ok=True)
     
     img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     if img is None:
-        print(f"Error: Could not read image from {path}")
         return None
         
     height, width = img.shape[:2]
@@ -41,7 +40,6 @@ def find_face(path, padding=20, input_size=112):
         cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
     )
     if face_cascade.empty():
-        print("Error: Could not load face classifier")
         return None
     
     faces = face_cascade.detectMultiScale(img, scaleFactor=1.1, minNeighbors=3)
@@ -53,6 +51,10 @@ def find_face(path, padding=20, input_size=112):
 
     contour_dir = "phis"
     os.makedirs(contour_dir, exist_ok=True)
+
+    faces_yuyv_dir = "faces_yuyv"
+    os.makedirs(faces_yuyv_dir, exist_ok=True)
+
     for i, (x, y, w, h) in enumerate(faces):
         padding = int(max(w, h) * 0.60)
         x1 = max(x - padding, 0)
@@ -73,8 +75,10 @@ def find_face(path, padding=20, input_size=112):
         save_path = os.path.join(output_dir, f'{os.path.splitext(os.path.basename(path))[0]}_face_{i+1}.pgm')
         cv2.imwrite(save_path, face_resized)
 
+        #yuyv_face = 
+
         phi_face = initialize_phi_mask(face_resized)
-        phi_path = os.path.join(contour_dir, f'{os.path.splitext(os.path.basename(path))[0]}_phi_face_{i+1}.pgm')
+        phi_path = os.path.join(contour_dir, f'{os.path.splitext(os.path.basename(path))[0]}_face_{i+1}.pgm')
         cv2.imwrite(phi_path, phi_face)
 
 
@@ -107,8 +111,6 @@ def get_next_face_index():
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python face_detector.py <image_path> [padding] [input_size]")
-        print("Defaults: padding=20, input_size=112")
         sys.exit(1)
     
     args = {
@@ -119,7 +121,6 @@ def main():
     
     processed_faces = find_face(**args)
     if not processed_faces:
-        print("No faces processed")
         sys.exit(0)
     
     model_path = "/home/pi/project2/mobilefacenet.tflite"
@@ -144,8 +145,5 @@ def main():
     existing_data.extend(embeddings_data)
     with open(output_path, 'w') as f:
         json.dump(existing_data, f, indent=4)
-    
-    print(f"Processed {len(processed_faces)} faces. Next index will be {next_index + len(processed_faces)}")
-
 if __name__ == "__main__":
     main()
