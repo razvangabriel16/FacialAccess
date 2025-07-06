@@ -8,6 +8,7 @@ extern void clahe_process(const unsigned char* input,
                    int height,
                    unsigned int* hist_buffer);
 
+
 int main(void) {
     camera_device_t cameras[MAX_CAMERAS];
     int num_cameras = list_cameras(cameras);
@@ -50,7 +51,6 @@ int main(void) {
     }
     fclose(f);
     
-
     int **equalized = (int **)malloc_matrix(640, 480, sizeof(int));
     DIE(!equalized, "malloc failed");
     clahe(grayscale_photo, 640, 480, 3 , 64, &equalized);
@@ -60,67 +60,76 @@ int main(void) {
     for(int i = 0; i < 480; ++i) {
         uint8_t *row = malloc(640);
         for(int j = 0; j < 640; ++j) {
-            // Clamp the value to 0-255 range
             int val = equalized[i][j];
             if(val < 0) val = 0;
             if(val > 255) val = 255;
             row[j] = (uint8_t)val;
+        }
+        fwrite(row, 1, 640, g);
+        free(row);
     }
-    fwrite(row, 1, 640, g);
-    free(row);
-}
-fclose(g);
-     //haar cascades part
+    fclose(g);
     //system("chmod +x /home/pi/project2/haar_select.py");
     int ret = system("python3 /home/pi/project2/haar_select.py /home/pi/project2/equalized.pgm");
     DIE(ret == -1, "python script failed");
     
+    f = fopen("/home/pi/project2/faces/equalized_face_1.pgm", "rb");
+    DIE(!f, "couldn't open the image file");
 
+    char magic[3];
+    int face_width, face_height, max_val;
+    int items_read;
+
+    items_read = fscanf(f, "%2s %d %d %d", magic, &face_width, &face_height, &max_val);
+    DIE(items_read != 4, "failed to read PGM header");
+    DIE(strcmp(magic, "P5") != 0, "not a valid P5 PGM file");
+    char c;
+    fread(&c, 1, 1, f);
     
-    
-/*
-     unsigned char *flat_grayscale = ( unsigned char*)malloc(640 * 480);
-    DIE(!flat_grayscale, "malloc failed");
-    
-    for (int y = 0; y < 480; ++y) {
-        for (int x = 0; x < 640; ++x) {
-            flat_grayscale[y * 640 + x] = ( unsigned char)grayscale_photo[y][x];
+    int **face_image = (int **)malloc_matrix(face_width, face_height, sizeof(int));
+    DIE(!face_image, "malloc failed");
+    for(int i = 0; i < face_height; ++i){
+        for(int j = 0; j < face_width; ++j){
+            uint8_t val;
+            fread(&val, sizeof(uint8_t), 1, f);
+            face_image[i][j] = (int)val;
         }
     }
-
-    unsigned char* output_image = ( unsigned char*)malloc(640 * 480);
-    DIE(!output_image, "malloc failed");
-
-    int* hist_buf1 = (int *)malloc(256 * sizeof(int));
-   
-    DIE(!hist_buf1, "n");
-
-
-    memset(hist_buf1, 0, 256 * sizeof(int));
-    clahe_process(flat_grayscale,output_image, 640, 480, hist_buf1); 
-
-    for(int i =0; i < 50; ++i)
-        printf("%d ", hist_buf1[i]);
-    printf("\n");
-
-    f = fopen("equalized.pgm", "wb");
-    fprintf(f, "P5\n%d %d\n255\n", 640, 480);
-    fwrite(output_image, 1, 640 * 480, f);
     fclose(f);
-            printf("***");
-    for(int i = 0; i < 100; ++i){
-        printf("%d", output_image[i]);
-    }
+    double** phi_final;
+/*geodesic_level_set_contour(face_image, &phi_final, face_width, face_height,
+                          1.0,
+                         1,
+                          0.1,
+                         100); */
+/*geodesic_level_set_contour(face_image, &phi_final, face_width, face_height,
+                          1.0,
+                          1,
+                          0.02,
+                          300);*/
+    geodesic_level_set_contour(face_image, &phi_final, face_width, face_height, 
+                                   1.0,//sigma pentru smoothing
+                                   0.5,//niu - baloon force; pozitiv pt extindere exterior, negativ interior
+                                   0.06,//dt, cat mai mic cu atat mai stabil
+                                   1500);
+                                   //2000); N
+                     
+   f = fopen("imagine_contour.pgm", "wb");
+    DIE(!f, "couldn't create output file");
 
-    free(buffer);
-    free(flat_grayscale);
-    free(output_image);
-    
-    for (int y = 0; y < 480; ++y) {
-        free(grayscale_photo[y]);
+    fprintf(f, "P5\n%d %d\n255\n", face_width, face_height);
+
+    for (int y = 0; y < face_height; ++y) {
+        for(int x = 0; x < face_width; ++x) {
+            double phi_val = phi_final[y][x];
+            unsigned char pixel_val;
+            if (phi_val > 0)
+                pixel_val = 255;
+            else
+                pixel_val = 0;
+            fwrite(&pixel_val, sizeof(unsigned char), 1, f);
+        }
     }
-    free(grayscale_photo);
- */   
-    
+    fclose(f);
     return 0;
 }
