@@ -1,9 +1,9 @@
 # Sistem de acces controlat bazat pe encodari faciale (lucrat pe Raspberry PI Zero 2W):
-	
+Rulare: ```make clean && make && ./detection_system (2> /dev/null) && display image_contouring.pgm```
 -   ## Hardware Overlook
 Sistem complex de alegere a celei mai performante camere disponibile conectate la placuta folosind API-ul v4l2 (Video4Linux2) si apeluri IOCTL catre kernel pentru interogarea capabilitatilor fiecarei camere gasite.
 - ## Smart Image Capturing 
- Am capturat o poza in format yuyv cu ajutorul apelului ioctl (cu gandul ca as putea sa optimizez cu NEON datorita organizarii registrelor). Dupa ce am cerut kernelului sa aloce un buffer pentru captura video(VIDIOC_REQBUFS) si am obtinut detalii(VIDIOC_QUERYBUF), am mapat bufferul in spatiul de memorie al procesului curent. Astfel mmap imi intoarce un pointer (uint8_t) care indica catre acest buffer partajat astfel incat sa nu trebuiasca sa copiem din kernel-space in user-space, reducand latenta.
+ Am capturat o poza in format yuyv cu ajutorul apelului ioctl (cu gandul ca as putea sa optimizez cu NEON datorita structurii registrelor). Dupa ce am cerut kernelului sa aloce un buffer pentru captura video(VIDIOC_REQBUFS) si am obtinut detalii(VIDIOC_QUERYBUF), am mapat bufferul in spatiul de memorie al procesului curent. Astfel mmap imi intoarce un pointer (uint8_t) care indica catre acest buffer partajat astfel incat sa nu trebuiasca sa copiem din kernel-space in user-space, reducand latenta.
 - ## CLAHE (Equalization) 
 Am realizat o implementare manuala a algoritmului CLAHE, folosit pentru imbunatatirea contrastului in imagini, pastrand in acelasi timp detaliile locale si evitand artefactele produse de egalizarea globala a histogramei. Procesul este descris astfel:
 Procesul include: Procesul include urmatorii pasi esentiali:
