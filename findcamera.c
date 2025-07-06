@@ -751,6 +751,39 @@ void edge_stopping_function_double(double **mag, double ***g, int width, int hei
     }
 }
 
+double compute_curvature_at_point(double **phi, int x, int y, int width, int height) {
+    if (x <= 0 || x >= width-1 || y <= 0 || y >= height-1) {
+        return 0.0;
+    }
+
+    const double eps = 1e-8;
+    
+    double phi_x = (phi[y][x + 1] - phi[y][x - 1]) / 2.0;
+    double phi_y = (phi[y + 1][x] - phi[y - 1][x]) / 2.0;
+    
+    double phi_xx = phi[y][x + 1] - 2.0 * phi[y][x] + phi[y][x - 1];
+    double phi_yy = phi[y + 1][x] - 2.0 * phi[y][x] + phi[y - 1][x];
+    double phi_xy = (phi[y + 1][x + 1] - phi[y + 1][x - 1] - 
+                   phi[y - 1][x + 1] + phi[y - 1][x - 1]) / 4.0;
+    
+    double grad_mag_sq = phi_x * phi_x + phi_y * phi_y + eps;
+    double grad_mag = sqrt(grad_mag_sq);
+    
+    return (phi_xx * phi_y * phi_y - 2.0 * phi_x * phi_y * phi_xy + 
+            phi_yy * phi_x * phi_x) / (grad_mag_sq * grad_mag);
+}
+
+void compute_gradient_at_point(double **phi, int x, int y, int width, int height, double *grad_x, double *grad_y) {
+    if (x <= 0 || x >= width-1 || y <= 0 || y >= height-1) {
+        *grad_x = 0.0;
+        *grad_y = 0.0;
+        return;
+    }
+
+    *grad_x = (phi[y][x + 1] - phi[y][x - 1]) / 2.0;
+    *grad_y = (phi[y + 1][x] - phi[y - 1][x]) / 2.0;
+}   
+
 void compute_curvature(double **phi, double ***curvature, int width, int height) {
     *curvature = (double **)malloc_matrix(width, height, sizeof(double));
     DIE(!(*curvature), "curvature malloc failed");
@@ -767,7 +800,7 @@ void compute_curvature(double **phi, double ***curvature, int width, int height)
             double phi_xy = (phi[y + 1][x + 1] - phi[y + 1][x - 1] - 
                            phi[y - 1][x + 1] + phi[y - 1][x - 1]) / 4.0;
             
-            //κ = div(∇φ/|∇φ|)
+            //κ = div(nabla φ/| nabla φ|)
             double grad_mag_sq = phi_x * phi_x + phi_y * phi_y + eps;
             double grad_mag = sqrt(grad_mag_sq);
             
@@ -786,37 +819,41 @@ void compute_curvature(double **phi, double ***curvature, int width, int height)
 }
 
 void reinitialize_level_set(double **phi, int width, int height) {
-    const double dt = 0.1;
+    const double dt = 0.05;
     const double eps = 1e-10;
+    const int num_steps = 5;
     
-    double **phi_grad_x, **phi_grad_y, **phi_grad_magnitude;
-    gradient_double(phi, &phi_grad_x, &phi_grad_y, width, height);
-    gradient_magnitude_double(phi_grad_x, phi_grad_y, &phi_grad_magnitude, width, height);
-    
-    double **phi_new = (double **)malloc_matrix(width, height,sizeof(double));
-    DIE(!phi_new, "reinit malloc failed");
-    
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            double sign_phi = phi[y][x] / sqrt(phi[y][x] * phi[y][x] + eps);
-            
-            //φ = φ - dt * sign(φ) * (|∇φ| - 1)
-            phi_new[y][x] = phi[y][x] - dt * sign_phi * (phi_grad_magnitude[y][x] - 1.0);
+    for (int step = 0; step < num_steps; step++) {
+        double **phi_grad_x, **phi_grad_y, **phi_grad_magnitude;
+        gradient_double(phi, &phi_grad_x, &phi_grad_y, width, height);
+        gradient_magnitude_double(phi_grad_x, phi_grad_y, &phi_grad_magnitude, width, height);
+        
+        double **phi_new = (double **)malloc_matrix(width, height, sizeof(double));
+        DIE(!phi_new, "reinit malloc failed");
+        
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                double sign_phi = phi[y][x] / sqrt(phi[y][x] * phi[y][x] + eps);
+                
+                //phi=phi - dt*sgn(phi)*(|nabla phi|-1)
+                phi_new[y][x] = phi[y][x] - dt * sign_phi * (phi_grad_magnitude[y][x] - 1.0);
+            }
         }
-    }
-    
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            phi[y][x] = phi_new[y][x];
+        
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                phi[y][x] = phi_new[y][x];
+            }
         }
+        
+        free_matrix((void**)phi_new, height);
+        free_matrix((void**)phi_grad_x, height);
+        free_matrix((void**)phi_grad_y, height);
+        free_matrix((void**)phi_grad_magnitude, height);
     }
-    
-    free_matrix((void**)phi_new, height);
-    free_matrix((void**)phi_grad_x, height);
-    free_matrix((void**)phi_grad_y, height);
-    free_matrix((void**)phi_grad_magnitude, height);
 }
 
+/*
 void geodesic_level_set_contour(int **image, double ***phi_final, int width, int height, 
                                double sigma, double nu, double dt, int N) {
     double **image_double = (double **)malloc_matrix(width, height, sizeof(double));
@@ -839,10 +876,33 @@ void geodesic_level_set_contour(int **image, double ***phi_final, int width, int
     gradient_double(I_smooth, &grad_x, &grad_y, width, height);
     gradient_magnitude_double(grad_x, grad_y, &grad_magnitude, width, height);
     
-    double **g;
-    edge_stopping_function_double(grad_magnitude, &g, width, height);
+    double **g = (double **)malloc_matrix(width, height, sizeof(double));
+    DIE(!g, "g malloc failed");
     
-    double **phi = (double **)malloc_matrix(height, width, sizeof(double));
+    double max_grad = 0.0;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            if (grad_magnitude[y][x] > max_grad) {
+                max_grad = grad_magnitude[y][x];
+            }
+        }
+    }
+    
+    double k = max_grad * 0.1;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            if (max_grad > 0) {
+                g[y][x] = 1.0 / (1.0 + (grad_magnitude[y][x] / k) * (grad_magnitude[y][x] / k));
+            } else {
+                g[y][x] = 1.0;
+            }
+        }
+    }
+    
+    double **g_grad_x, **g_grad_y;
+    gradient_double(g, &g_grad_x, &g_grad_y, width, height);
+    
+    double **phi = (double **)malloc_matrix(width, height, sizeof(double));
     DIE(!phi, "phi malloc failed");
     
     double center_x = width / 2.0;
@@ -864,11 +924,36 @@ void geodesic_level_set_contour(int **image, double ***phi_final, int width, int
         double **curvature;
         compute_curvature(phi, &curvature, width, height);
         
+        double **phi_new = (double **)malloc_matrix(width, height, sizeof(double));
+        DIE(!phi_new, "phi_new malloc failed");
+        
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-                double update = dt * phi_grad_magnitude[y][x] * g[y][x] * 
-                              (curvature[y][x] + nu);
-                phi[y][x] += update;
+                phi_new[y][x] = phi[y][x];
+            }
+        }
+        
+        for (int y = 1; y < height - 1; y++) {
+            for (int x = 1; x < width - 1; x++) {
+                if (phi_grad_magnitude[y][x] < 1e-10) continue;
+                
+                double grad_g_dot_grad_phi = g_grad_x[y][x] * phi_grad_x[y][x] + 
+                                           g_grad_y[y][x] * phi_grad_y[y][x];
+                
+                double curvature_term = g[y][x] * curvature[y][x];
+                double advection_term = grad_g_dot_grad_phi;
+                double balloon_term = nu;
+                
+                double update = dt * phi_grad_magnitude[y][x] * 
+                              (curvature_term + balloon_term + advection_term);
+                
+                phi_new[y][x] = phi[y][x] + update;
+            }
+        }
+        
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                phi[y][x] = phi_new[y][x];
             }
         }
         
@@ -876,10 +961,15 @@ void geodesic_level_set_contour(int **image, double ***phi_final, int width, int
             reinitialize_level_set(phi, width, height);
         }
         
+        free_matrix((void**)phi_new, height);
         free_matrix((void**)phi_grad_x, height);
         free_matrix((void**)phi_grad_y, height);
         free_matrix((void**)phi_grad_magnitude, height);
         free_matrix((void**)curvature, height);
+        
+        if (iter % 50 == 0) {
+            printf("Iteration %d/%d\n", iter, N);
+        }
     }
     
     *phi_final = phi;
@@ -891,4 +981,416 @@ void geodesic_level_set_contour(int **image, double ***phi_final, int width, int
     free_matrix((void**)grad_y, height);
     free_matrix((void**)grad_magnitude, height);
     free_matrix((void**)g, height);
+    free_matrix((void**)g_grad_x, height);
+    free_matrix((void**)g_grad_y, height);
+}*/
+/*
+void geodesic_level_set_contour(int **image, double ***phi_final, int width, int height, 
+                                        double sigma, double nu, double dt, int N) {
+    double **image_double = (double **)malloc_matrix(width, height, sizeof(double));
+    DIE(!image_double, "image_double malloc failed");
+    
+    double max_val = 0.0, min_val = 255.0;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            if (image[y][x] > max_val) max_val = image[y][x];
+            if (image[y][x] < min_val) min_val = image[y][x];
+        }
+    }
+    
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            image_double[y][x] = (double)(image[y][x] - min_val) / (max_val - min_val);
+        }
+    }
+    
+    int kernel_size;
+    double **gaussian_kernel = createGaussianKernel(sigma, &kernel_size);
+    int kernel_size_half = kernel_size / 2;
+    
+    double **I_smooth;
+    convolve(width, height, image_double, &I_smooth, kernel_size_half, gaussian_kernel);
+    
+    double **grad_x, **grad_y, **grad_magnitude;
+    gradient_double(I_smooth, &grad_x, &grad_y, width, height);
+    gradient_magnitude_double(grad_x, grad_y, &grad_magnitude, width, height);
+    
+    double **g = (double **)malloc_matrix(width, height, sizeof(double));
+    DIE(!g, "g malloc failed");
+    
+    double mean_grad = 0.0, std_grad = 0.0;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            mean_grad += grad_magnitude[y][x];
+        }
+    }
+    mean_grad /= (width * height);
+    
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            std_grad += (grad_magnitude[y][x] - mean_grad) * (grad_magnitude[y][x] - mean_grad);
+        }
+    }
+    std_grad = sqrt(std_grad / (width * height));
+    
+    double k = mean_grad + 0.5 * std_grad;
+    
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            double normalized_grad = grad_magnitude[y][x] / (k + 1e-10);
+            g[y][x] = 1.0 / (1.0 + normalized_grad * normalized_grad * normalized_grad);
+        }
+    }
+    
+    double **g_grad_x, **g_grad_y;
+    gradient_double(g, &g_grad_x, &g_grad_y, width, height);
+    
+    double **phi = (double **)malloc_matrix(width, height, sizeof(double));
+    DIE(!phi, "phi malloc failed");
+    
+    double center_x = width / 2.0;
+    double center_y = height / 2.0;
+    double radius = fmin(width, height) / 8.0;
+    
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            double dist = sqrt((x - center_x) * (x - center_x) + (y - center_y) * (y - center_y));
+            phi[y][x] = dist - radius;
+        }
+    }
+    
+    for (int iter = 0; iter < N; iter++) {
+        double **phi_grad_x, **phi_grad_y, **phi_grad_magnitude;
+        gradient_double(phi, &phi_grad_x, &phi_grad_y, width, height);
+        gradient_magnitude_double(phi_grad_x, phi_grad_y, &phi_grad_magnitude, width, height);
+        
+        double **curvature;
+        compute_curvature(phi, &curvature, width, height);
+        
+        double **phi_new = (double **)malloc_matrix(width, height, sizeof(double));
+        DIE(!phi_new, "phi_new malloc failed");
+        
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                phi_new[y][x] = phi[y][x];
+            }
+        }
+        
+        for (int y = 1; y < height - 1; y++) {
+            for (int x = 1; x < width - 1; x++) {
+                if (phi_grad_magnitude[y][x] < 1e-10) continue;
+                
+                double grad_g_dot_grad_phi = g_grad_x[y][x] * phi_grad_x[y][x] + 
+                                           g_grad_y[y][x] * phi_grad_y[y][x];
+                
+                double adaptive_nu = nu * g[y][x];
+                
+
+                double curvature_term = g[y][x] * curvature[y][x];
+                double advection_term = grad_g_dot_grad_phi;
+                double balloon_term = adaptive_nu;
+                
+                double total_force = curvature_term + balloon_term + advection_term;
+                double local_dt = dt * g[y][x];
+                
+                double update = local_dt * phi_grad_magnitude[y][x] * total_force;
+                
+                double max_update = 0.5; 
+                if (fabs(update) > max_update)
+                    update = (update > 0) ? max_update : -max_update;
+                
+                phi_new[y][x] = phi[y][x] + update;
+            }
+        }
+        for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+                phi[y][x] = phi_new[y][x];
+        
+        if (iter % 20 == 0 && iter > 0) {
+            reinitialize_level_set(phi, width, height);
+        }
+        
+        free_matrix((void**)phi_new, height);
+        free_matrix((void**)phi_grad_x, height);
+        free_matrix((void**)phi_grad_y, height);
+        free_matrix((void**)phi_grad_magnitude, height);
+        free_matrix((void**)curvature, height);
+        
+        if (iter % 100 == 0)
+            printf("currently at Iteration %d/%d\n", iter, N);
+    }
+    
+    *phi_final = phi;
+    
+    free_matrix((void**)image_double, height);
+    free_matrix((void**)gaussian_kernel, kernel_size);
+    free_matrix((void**)I_smooth, height);
+    free_matrix((void**)grad_x, height);
+    free_matrix((void**)grad_y, height);
+    free_matrix((void**)grad_magnitude, height);
+    free_matrix((void**)g, height);
+    free_matrix((void**)g_grad_x, height);
+    free_matrix((void**)g_grad_y, height);
+} */
+
+int update(double a, double b, double c, double d, double e) {
+    
+}
+
+void geodesic_level_set_contour(int **image, double ***phi_final, int width, int height, 
+                                        double sigma, double nu, double dt, int N) {
+    double **image_double = (double **)malloc_matrix(width, height, sizeof(double));
+    DIE(!image_double, "image_double malloc failed");
+    
+    double max_val = 0.0, min_val = 255.0;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            if (image[y][x] > max_val) 
+                max_val = image[y][x];
+            if (image[y][x] < min_val) 
+                min_val = image[y][x];
+        }
+    }
+    
+    for (int y = 0; y < height; y++)
+        for (int x = 0; x < width; x++)
+            image_double[y][x] = (double)(image[y][x] - min_val) / (max_val - min_val);
+ 
+    int kernel_size;
+    double **gaussian_kernel = createGaussianKernel(sigma, &kernel_size);
+    int kernel_size_half = kernel_size / 2;
+    
+    double **I_smooth;
+    convolve(width, height, image_double, &I_smooth, kernel_size_half, gaussian_kernel);
+    
+    double **grad_x, **grad_y, **grad_magnitude;
+    gradient_double(I_smooth, &grad_x, &grad_y, width, height);
+    gradient_magnitude_double(grad_x, grad_y, &grad_magnitude, width, height);
+    double **g = (double **)malloc_matrix(width, height, sizeof(double));
+    DIE(!g, "g malloc failed");
+    
+    double mean_grad = 0.0, std_grad = 0.0;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            mean_grad += grad_magnitude[y][x];
+        }
+    }
+    mean_grad /= (width * height);
+    
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            std_grad += (grad_magnitude[y][x] - mean_grad) * (grad_magnitude[y][x] - mean_grad);
+        }
+    }
+    std_grad = sqrt(std_grad / (width * height));
+    
+    // Adaptive threshold pentru edge stopping
+    double k = mean_grad + 0.5 * std_grad;
+    
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            double normalized_grad = grad_magnitude[y][x] / (k + 1e-10);
+            g[y][x] = 1.0 / (1.0 + normalized_grad * normalized_grad * normalized_grad); // Cubica pentru stopare mai puternicA
+        }
+    }
+    
+    double **g_grad_x, **g_grad_y;
+    gradient_double(g, &g_grad_x, &g_grad_y, width, height);
+    
+    double **phi = (double **)malloc_matrix(width, height, sizeof(double));
+    DIE(!phi, "phi malloc failed");
+    
+    double center_x = width / 2.0;
+    double center_y = height / 2.0;
+    double radius = fmin(width, height) / 8.0; // Initial voiam sa plec cu un cerc initial cat cercyl maxim care poate fi inscris in poza, dar alegem unul mai mic in interior + extindere
+    
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            double dist = sqrt((x - center_x) * (x - center_x) + (y - center_y) * (y - center_y));
+            phi[y][x] = dist - radius;
+        }
+    }
+    
+    for (int iter = 0; iter < N; iter++) {
+        double **phi_grad_x, **phi_grad_y, **phi_grad_magnitude;
+        gradient_double(phi, &phi_grad_x, &phi_grad_y, width, height);
+        gradient_magnitude_double(phi_grad_x, phi_grad_y, &phi_grad_magnitude, width, height);
+        
+        double **curvature;
+        compute_curvature(phi, &curvature, width, height);
+        
+        double **phi_new = (double **)malloc_matrix(width, height, sizeof(double));
+        DIE(!phi_new, "phi_new malloc failed");
+        
+        for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+                phi_new[y][x] = phi[y][x];
+
+        for (int y = 1; y < height - 1; y++) {
+            for (int x = 1; x < width - 1; x++) {
+                if (phi_grad_magnitude[y][x] < 1e-10)
+                    continue;
+                double grad_g_dot_grad_phi = g_grad_x[y][x] * phi_grad_x[y][x] + 
+                                   g_grad_y[y][x] * phi_grad_y[y][x];
+        
+                double adaptive_nu = nu * g[y][x];
+                double curvature_term = g[y][x] * curvature[y][x];
+                double advection_term = grad_g_dot_grad_phi;
+                double balloon_term = adaptive_nu;
+        
+                double total_force = curvature_term + balloon_term + advection_term;
+                double local_dt = dt * g[y][x];
+        
+                // primul pas din RK2 (Euler simplu)
+                double k1 = local_dt * phi_grad_magnitude[y][x] * total_force;
+        
+                double max_update = 0.5;
+                if (fabs(k1) > max_update)
+                     k1 = (k1 > 0) ? max_update : -max_update;
+        
+                //permenul de la midpoint() phi + k1/2)
+                //ne trebuie gradientul si curvature pt acest punct - partea cea mai complexa
+                double original_phi = phi[y][x];
+        
+                phi[y][x] = original_phi + k1/2.0;
+                double midpoint_phi_grad_x, midpoint_phi_grad_y;
+                compute_gradient_at_point(phi, x,y, width, height, &midpoint_phi_grad_x, &midpoint_phi_grad_y);
+                double midpoint_phi_grad_magnitude = sqrt(midpoint_phi_grad_x*midpoint_phi_grad_x + 
+                                               midpoint_phi_grad_y*midpoint_phi_grad_y);
+        
+                double midpoint_curvature = compute_curvature_at_point(phi, x, y, width, height);
+                double midpoint_grad_g_dot_grad_phi = g_grad_x[y][x] * midpoint_phi_grad_x + 
+                                           g_grad_y[y][x] * midpoint_phi_grad_y;
+        
+                double midpoint_total_force = g[y][x] * midpoint_curvature + 
+                                   adaptive_nu + 
+                                   midpoint_grad_g_dot_grad_phi;
+        
+                //pasul 2 din rk2
+                double k2 = local_dt * midpoint_phi_grad_magnitude * midpoint_total_force;
+        
+                if (fabs(k2) > max_update)
+                     k2 = (k2 > 0) ? max_update : -max_update;
+
+                phi[y][x] = original_phi;
+                phi_new[y][x] = original_phi + k2;
+            }
+        }
+        for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+                phi[y][x] = phi_new[y][x];
+
+        if (iter % 20 == 0 && iter > 0) {
+            reinitialize_level_set(phi, width, height);
+        }
+        
+        free_matrix((void**)phi_new, height);
+        free_matrix((void**)phi_grad_x, height);
+        free_matrix((void**)phi_grad_y, height);
+        free_matrix((void**)phi_grad_magnitude, height);
+        free_matrix((void**)curvature, height);
+        
+        if (iter % 100 == 0) {
+            printf("current Iteration %d/%d\n", iter, N);
+        }
+    }
+    
+    *phi_final = phi;
+    
+    free_matrix((void**)image_double, height);
+    free_matrix((void**)gaussian_kernel, kernel_size);
+    free_matrix((void**)I_smooth, height);
+    free_matrix((void**)grad_x, height);
+    free_matrix((void**)grad_y, height);
+    free_matrix((void**)grad_magnitude, height);
+    free_matrix((void**)g, height);
+    free_matrix((void**)g_grad_x, height);
+    free_matrix((void**)g_grad_y, height);
+} 
+
+void initialize_phi_from_edges(double **phi, double **grad_magnitude, int width, int height) {
+    double threshold = 0.0;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            threshold += grad_magnitude[y][x];
+        }
+    }
+    threshold /= (width * height);
+    threshold *= 2.0;
+    
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            if (grad_magnitude[y][x] > threshold) {
+                phi[y][x] = -1.0; //inauntru
+            } else {
+                phi[y][x] = 1.0;  // afara
+            }
+        }
+    }
+    
+    double **phi_smooth;
+    int kernel_size;
+    double **gaussian_kernel = createGaussianKernel(2.0, &kernel_size);
+    int kernel_size_half = kernel_size / 2;
+    convolve(width, height, phi, &phi_smooth, kernel_size_half, gaussian_kernel);
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            phi[y][x] = phi_smooth[y][x];
+        }
+    }
+    
+    free_matrix((void**)phi_smooth, height);
+    free_matrix((void**)gaussian_kernel, kernel_size);
+}
+
+void pure_balloon_model(int **image, double ***phi_final, int width, int height, 
+                       double nu, double dt, int N) {
+    printf("Pure balloon model: nu=%.2f, dt=%.4f, N=%d\n", nu, dt, N);
+    
+    double **phi = (double **)malloc_matrix(width, height, sizeof(double));
+    DIE(!phi, "phi malloc failed");
+    double center_x = width / 2.0;
+    double center_y = height / 2.0;
+    double radius = fmin(width, height) / 20.0;
+    
+    for (int y = 0; y < height; y++)
+        for (int x = 0; x < width; x++) {
+            double dist = sqrt((x - center_x) * (x - center_x) + (y - center_y) * (y - center_y));
+            phi[y][x] = dist - radius;
+        }
+    
+    for (int iter = 0; iter < N; iter++) {
+        double **phi_grad_x, **phi_grad_y, **phi_grad_magnitude;
+        gradient_double(phi, &phi_grad_x, &phi_grad_y, width, height);
+        gradient_magnitude_double(phi_grad_x, phi_grad_y, &phi_grad_magnitude, width, height);
+        
+        double **phi_new = (double **)malloc_matrix(width, height, sizeof(double));
+        DIE(!phi_new, "phi_new malloc failed");
+        
+        for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+                phi_new[y][x] = phi[y][x];
+        for (int y = 1; y < height - 1; y++) {
+            for (int x = 1; x < width - 1; x++) {
+                double update = dt * phi_grad_magnitude[y][x] * nu;
+                phi_new[y][x] = phi[y][x] + update;
+            }
+        }
+        for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+                phi[y][x] = phi_new[y][x];
+
+        
+        if (iter % 20 == 0)
+            printf("Balloon iteration %d/%d\n", iter, N);
+        if (iter % 5 == 0 && iter > 0)
+            reinitialize_level_set(phi, width, height);
+        
+        free_matrix((void**)phi_new, height);
+        free_matrix((void**)phi_grad_x, height);
+        free_matrix((void**)phi_grad_y, height);
+        free_matrix((void**)phi_grad_magnitude, height);
+    }
+    
+    *phi_final = phi;
 }
