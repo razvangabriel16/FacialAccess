@@ -4,7 +4,14 @@ Currently TODO: store the encoding facial vector in a file in TrustZone.
 
 ### Rulare: ```make clean && make && make shared && ./detection_system (2> /dev/null) ```
 Conectare la SSH intrucat nu am instalat utilitarul ```image magic``` pentru ```display```
--   ## Hardware Overlook
+- ## Getting comprehensive stats
+Pentru verificare constanta a temperaturii, statusul throttling-ului (limitări din cauza supraîncălzirii sau alimentării slabe) cu ajutorul utilitarului oficial de diagnostic: ```vcgencmd```
+sau cu ```/sys/class/thermal/thermal_zone0/temp```. Pentru frecventa curenta a CPU-ului pot folosi ```top```. Analizez si memoria. Analiza fiecarei din aceste resurse se face intr-un thread separat. 
+Functia de thread este una polimorfica, pentru fiecare resursa. Aici se creaza un proces copil la fiecare verificare.
+:bug: daca voi implementa TrustZone pentru stocarea vectorilor de encodare, aceste resurse nu vor mai fi monitorizate intrucat la EL3 cand SecureMonitor schimba contextul si incarca un context complet diferit (registre, MMU, SP etc.) pentru Secure World, timp in care resursele pt normal world sunt "inghetate"
+
+Rulează un alt fir de execuție, complet izolat.
+- ## Hardware Overlook
 Sistem complex de alegere a celei mai performante camere disponibile conectate la placuta folosind API-ul v4l2 (Video4Linux2) si apeluri IOCTL catre kernel pentru interogarea capabilitatilor fiecarei camere gasite.
 - ## Smart Image Capturing 
  Am capturat o poza in format yuyv cu ajutorul apelului ioctl (cu gandul ca as putea sa optimizez cu NEON datorita structurii registrelor). Dupa ce am cerut kernelului sa aloce un buffer pentru captura video(VIDIOC_REQBUFS) si am obtinut detalii(VIDIOC_QUERYBUF), am mapat bufferul in spatiul de memorie al procesului curent. Astfel mmap imi intoarce un pointer (uint8_t) care indica catre acest buffer partajat astfel incat sa nu trebuiasca sa copiem din kernel-space in user-space, reducand latenta.
@@ -29,8 +36,6 @@ In aceasta parte, am folosit RungeKutta2 pentru rezolvarea PDE, nu Euler. Initia
 
   
 ### TODO:
- Pentru verificare constanta a temperaturii, statusul throttling-ului (limitări din cauza supraîncălzirii sau alimentării slabe) cu ajutorul utilitarului oficial de diagnostic: ```vcgencmd```
-sau cu ```/sys/class/thermal/thermal_zone0/temp```. Pentru frecventa curenta a CPU-ului pot folosi ```top```. Pot rula asta intr-un thread separat, iar la final pot obtine statistici de dupa fiecare excutie.
 Pe viitor:
 -   Daca voi avea timp, voi face acest contouring si cu implementare de min-heap + Djkastra (strict pentru comparatie timp pt computatie cu implementarea curenta)
 -   Optimizari in asm cu registrele NEON (inca citesc)
