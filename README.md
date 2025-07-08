@@ -19,7 +19,8 @@ Procesul include: Procesul include urmatorii pasi esentiali:
   <img width="598" alt="image" src="https://github.com/user-attachments/assets/0676f5c9-620d-4575-a649-c5848c9e6b77" />
 Referinta de la care am studiat algoritmul (partea matematica foarte stufoasa ):  [https://research-repository.st-andrews.ac.uk/bitstream/handle/10023/15903/IET_IPR.2018.5796.pdf;jsessionid=1EAF0A5538B64874945F79DDD86C9669?sequence=1](https://research-repository.st-andrews.ac.uk/bitstream/handle/10023/15903/IET_IPR.2018.5796.pdf;jsessionid=1EAF0A5538B64874945F79DDD86C9669?sequence=1) 
 In aceasta parte, am folosit RungeKutta2 pentru rezolvarea PDE, nu Euler. Initial am vrut sa implementez RK4 dar dura foarte mult la rulare, erau enrom de multe computatii. Si acum sunt comparativ cu solutia intitiala, dar am obtinut exactitate sporita. Pentru ca nu putem lasa un numar prea mare de iteratii, obtinem o masca dupa LSC si apoi interpolam punctele din masca cu cubic spline (C2) sau Hermite, pentru a obtine acuratete mai mare. In script-ul pentru interpolare am apelat pentru prima oara o functie asm din python cu shared library ctypes.
-<img width="603" alt="image" src="https://github.com/user-attachments/assets/11e120c7-ed69-4cdb-88b2-2f37ad8099d2" />
+<img width="179" alt="image" src="https://github.com/user-attachments/assets/11e120c7-ed69-4cdb-88b2-2f37ad8099d2" />
+<img width="179" alt="image" src="https://github.com/user-attachments/assets/349d175c-c1bf-419e-9fc8-fe021fb6a827" />
 <img width="179" alt="image" src="https://github.com/user-attachments/assets/abb083c7-9466-4e1e-b684-7c5dbc33d247" />
 
   
