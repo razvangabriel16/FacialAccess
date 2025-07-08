@@ -8,8 +8,81 @@ extern void clahe_process(const unsigned char* input,
                    int height,
                    unsigned int* hist_buffer);
 
+typedef struct {
+    char* command;
+    char* args[MAX_ARGS_MONITOR];
+    char* output_file;
+    int interval;
+} monitor_config_t;
+
+void* monitor_thread(void* arg){
+    monitor_config_t* config = (monitor_config_t*)arg;
+    while(1){
+        pid_t pid = fork();
+        DIE(pid == -1, "fork err\n");
+        if(!pid){
+            int fd = open(config->output_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
+            DIE(fd == -1, "open file failed");
+            DIE(dup2(fd, STDOUT_FILENO) == -1, "dup2 failed");
+            close(fd);
+            execvp(config->command, config->args);
+            perror("execvp failed");
+            exit(1);
+        }else{
+            int status;
+            wait(&status);
+            //DIE(WIFEXITED(status) && WEXITSTATUS(status) != 0, "failed\n");
+            if(WIFEXITED(status) && WEXITSTATUS(status) == 0){
+                int fd = open(config->output_file, O_WRONLY | O_APPEND, 0644);
+                if(fd != -1){
+                    write(fd, "\n", 1);
+                    close(fd);
+                }
+            }
+        }
+        sleep(config->interval);
+    }
+    return NULL;
+}
+
+void multithread_stats(void){
+    monitor_config_t temp_config = {
+        .command = "vcgencmd",
+        .args = {"vcgencmd", "get_temp", NULL},
+        .output_file = "/home/pi/project2/stats/temp",
+        .interval = 5
+    };  
+    monitor_config_t throttle_config = {
+        .command = "vcgencmd",
+        .args = {"vcgencmd", "get_throttled", NULL},
+        .output_file = "/home/pi/project2/stats/throttled",
+        .interval = 10
+    };  
+    monitor_config_t cpu_config = {
+        .command = "cat",
+        .args = {"cat", "/proc/loadavg", NULL},
+        .output_file = "/home/pi/project2/stats/cpu_load",
+        .interval = 5
+    };  
+    monitor_config_t memory_config = {
+        .command = "free",
+        .args = {"free", "-h", NULL},
+        .output_file = "/home/pi/project2/stats/memory",
+        .interval = 10
+    };
+    pthread_t temp_thread, throttle_thread, cpu_thread, memory_thread;
+    pthread_create(&temp_thread, NULL, monitor_thread, &temp_config);
+    pthread_create(&throttle_thread, NULL, monitor_thread, &throttle_config);
+    pthread_create(&cpu_thread, NULL, monitor_thread, &cpu_config);
+    pthread_create(&memory_thread, NULL, monitor_thread, &memory_config);
+    pthread_join(temp_thread, NULL);
+    pthread_join(throttle_thread, NULL);
+    pthread_join(cpu_thread, NULL);
+    pthread_join(memory_thread, NULL);
+}
 
 int main(void) {
+    multithread_stats();
     camera_device_t cameras[MAX_CAMERAS];
     int num_cameras = list_cameras(cameras);
     DIE(!num_cameras, "No cameras found!\n");
@@ -28,7 +101,7 @@ int main(void) {
     capture_result_t result = capture_image_yuyv(cameras, "/home/pi/project2/output.yuv", best_camera_idx, max_resolution);
     
     FILE* captured_photo = fopen("/home/pi/project2/output.yuv", "rb");
-    DIE(!captured_photo, "No photo available");
+    DIE(!captured_photo, "no photo available");
     
     unsigned char *buffer = (unsigned char *)malloc(640 * 480 * 2);
     DIE(!buffer, "malloc failed");
@@ -111,7 +184,8 @@ int main(void) {
                                    1.0,//sigma pentru smoothing
                                    0.5,//niu - baloon force; pozitiv pt extindere exterior, negativ interior
                                    0.06,//dt, cat mai mic cu atat mai stabil
-                                   1500);
+                                   1200);
+                                   //1500);
                                    //2000); N
                      
    f = fopen("imagine_contour.pgm", "wb");
@@ -131,5 +205,8 @@ int main(void) {
         }
     }
     fclose(f);
+    //chmod +x interpolate.py
+    //int ret2 = system("python3 /home/pi/project2/interpolate.py");
+    //DIE(ret2 == -1, "python script2 err\n");
     return 0;
 }
