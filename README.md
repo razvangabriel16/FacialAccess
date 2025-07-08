@@ -2,7 +2,8 @@
 
 Currently TODO: store the encoding facial vector in a file in TrustZone.
 
-Rulare: ```make clean && make && make shared && ./detection_system (2> /dev/null) ```
+### Rulare: ```make clean && make && make shared && ./detection_system (2> /dev/null) ```
+Conectare la SSH intrucat nu am instalat utilitarul ```image magic``` pentru ```display```
 -   ## Hardware Overlook
 Sistem complex de alegere a celei mai performante camere disponibile conectate la placuta folosind API-ul v4l2 (Video4Linux2) si apeluri IOCTL catre kernel pentru interogarea capabilitatilor fiecarei camere gasite.
 - ## Smart Image Capturing 
