@@ -19,7 +19,7 @@ TARGET = detection_system
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ -lm
+	$(CC) $(CFLAGS) -o $@ $^ -lm -lpthread
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
