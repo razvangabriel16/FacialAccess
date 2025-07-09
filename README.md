@@ -1,4 +1,5 @@
 # Sistem de acces controlat bazat pe encodari faciale (lucrat pe Raspberry PI Zero 2W):
+![WhatsApp Image 2025-07-09 at 17 17 53_634bca52](https://github.com/user-attachments/assets/887cd0fa-11a8-46b8-be1a-284e3208f9fa)
 
 Currently TODO: store the encoding facial vector in a file in TrustZone.
 
