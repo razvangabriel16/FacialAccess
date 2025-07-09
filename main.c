@@ -10,13 +10,38 @@ extern void clahe_process(const unsigned char* input,
 
 typedef struct {
     char* command;
-    char* args[MAX_ARGS_MONITOR];
+    char** args;
     char* output_file;
     int interval;
 } monitor_config_t;
 
+void deep_copy(void* arg_void, monitor_config_t** out_new_config) {
+    monitor_config_t* arg = (monitor_config_t*)arg_void;
+
+    *out_new_config = malloc(sizeof(monitor_config_t));
+    DIE(!*out_new_config, "malloc failed");
+    (*out_new_config)->command = strdup(arg->command);
+    DIE(!(*out_new_config)->command, "strdup failed");
+    (*out_new_config)->output_file = strdup(arg->output_file);
+    DIE(!(*out_new_config)->output_file, "strdup failed\n");
+    (*out_new_config)->interval = arg->interval;
+    int argc = 0;
+    while (arg->args[argc]) argc++;
+    (*out_new_config)->args = malloc((argc + 1) * sizeof(char*));
+    DIE(!(*out_new_config)->args, "malloc failed for args");
+
+    for (int i = 0; i < argc; i++) {
+        (*out_new_config)->args[i] = strdup(arg->args[i]);
+        DIE(!(*out_new_config)->args[i], "strdup failed for args[i]");
+    }
+    (*out_new_config)->args[argc] = NULL;
+}
+
+
 void* monitor_thread(void* arg){
-    monitor_config_t* config = (monitor_config_t*)arg;
+   monitor_config_t* config;
+   deep_copy(arg, &config);
+    //monitor_config_t* config = (monitor_config_t*)arg;
     while(1){
         pid_t pid = fork();
         DIE(pid == -1, "fork err\n");
@@ -46,27 +71,32 @@ void* monitor_thread(void* arg){
 }
 
 void multithread_stats(void){
+    static char* temp_args[] = {"vcgencmd", "get_temp", NULL};
+    static char* throttle_args[] = {"vcgencmd", "get_throttled", NULL};
+    static char* cpu_args[] = {"cat", "/proc/loadavg", NULL};
+    static char* memory_args[] = {"free", "-h", NULL};
+    
     monitor_config_t temp_config = {
         .command = "vcgencmd",
-        .args = {"vcgencmd", "get_temp", NULL},
+        .args = temp_args,
         .output_file = "/home/pi/project2/stats/temp",
         .interval = 5
     };  
     monitor_config_t throttle_config = {
         .command = "vcgencmd",
-        .args = {"vcgencmd", "get_throttled", NULL},
+        .args = throttle_args,
         .output_file = "/home/pi/project2/stats/throttled",
         .interval = 10
     };  
     monitor_config_t cpu_config = {
         .command = "cat",
-        .args = {"cat", "/proc/loadavg", NULL},
+        .args = cpu_args,
         .output_file = "/home/pi/project2/stats/cpu_load",
         .interval = 5
     };  
     monitor_config_t memory_config = {
         .command = "free",
-        .args = {"free", "-h", NULL},
+        .args = memory_args,
         .output_file = "/home/pi/project2/stats/memory",
         .interval = 10
     };
@@ -75,10 +105,14 @@ void multithread_stats(void){
     pthread_create(&throttle_thread, NULL, monitor_thread, &throttle_config);
     pthread_create(&cpu_thread, NULL, monitor_thread, &cpu_config);
     pthread_create(&memory_thread, NULL, monitor_thread, &memory_config);
-    pthread_join(temp_thread, NULL);
-    pthread_join(throttle_thread, NULL);
-    pthread_join(cpu_thread, NULL);
-    pthread_join(memory_thread, NULL);
+    //pthread_join(temp_thread, NULL);
+    //pthread_join(throttle_thread, NULL);
+    //pthread_join(cpu_thread, NULL);
+    //pthread_join(memory_thread, NULL);
+    pthread_detach(temp_thread);
+    pthread_detach(throttle_thread);
+    pthread_detach(cpu_thread);
+    pthread_detach(memory_thread);
 }
 
 int main(void) {
