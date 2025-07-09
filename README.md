@@ -2,7 +2,7 @@
 
 Currently TODO: store the encoding facial vector in a file in TrustZone.
 
-### Rulare: ```make clean && make && make shared && ./detection_system (2> /dev/null) ```
+### Rulare: ```chmod +x run_command && ./run_command```
 Conectare la SSH intrucat nu am instalat utilitarul ```image magic``` pentru ```display```
 - ## Getting comprehensive stats
 Pentru verificare constanta a temperaturii, statusul throttling-ului (limitari din cauza supraincalzirii sau alimentarii slabe) cu ajutorul utilitarului oficial de diagnostic: ```vcgencmd```
