@@ -1,0 +1,25 @@
+#!/bin/bash
+mkdir -p /home/pi/project2/stats
+if [ -f "/home/pi/project2/stats/temp" ]; then
+    > /home/pi/project2/stats/temp
+else
+    touch  /home/pi/project2/stats/temp
+fi
+if [ -f "/home/pi/project2/stats/memory" ]; then
+    > /home/pi/project2/stats/memory
+else
+    touch /home/pi/project2/stats/memory
+fi
+if [ -f "/home/pi/project2/stats/cpu_load" ]; then
+    > /home/pi/project2/stats/cpu_load
+else
+    touch /home/pi/project2/stats/cpu_load
+fi
+if [ -f "/home/pi/project2/stats/throttled" ]; then
+    > /home/pi/project2/stats/throttled
+else
+    touch /home/pi/project2/stats/throttled
+fi
+cd /home/pi/project2
+chmod +x *.py
+make clean && make shared && make && ./detection_system
