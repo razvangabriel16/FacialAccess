@@ -1,4 +1,5 @@
 #!/bin/bash
+source /home/pi/venv/bin/activate
 mkdir -p /home/pi/project2/stats
 if [ -f "/home/pi/project2/stats/temp" ]; then
     > /home/pi/project2/stats/temp
