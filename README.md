@@ -9,7 +9,9 @@ Conectare la SSH intrucat nu am instalat utilitarul ```image magic``` pentru ```
 Pentru verificare constanta a temperaturii, statusul throttling-ului (limitari din cauza supraincalzirii sau alimentarii slabe) cu ajutorul utilitarului oficial de diagnostic: ```vcgencmd```
 sau cu ```/sys/class/thermal/thermal_zone0/temp```. Pentru frecventa curenta a CPU-ului pot folosi ```top```. Analizez si memoria. Analiza fiecarei din aceste resurse se face intr-un thread separat. 
 Functia de thread este una polimorfica, pentru fiecare resursa. Aici se creaza un proces copil la fiecare verificare.
-🐛: daca voi implementa TrustZone pentru stocarea vectorilor de encodare, aceste resurse nu vor mai fi monitorizate intrucat la EL3 cand SecureMonitor schimba contextul si incarca un context complet diferit (registre, MMU, SP etc.) pentru Secure World (ruleaza un alt fir de executeie, complet izolat), timp in care resursele pt normal world sunt "inghetate"
+🐛: daca voi implementa TrustZone pentru stocarea vectorilor de encodare, aceste resurse nu vor mai fi monitorizate intrucat la EL3 cand SecureMonitor schimba contextul si incarca un context complet diferit (registre, MMU, SP etc.) pentru Secure World (ruleaza un alt fir de executeie, complet izolat), timp in care resursele pt normal world sunt "inghetate". 
+
+In plus, am aflat ca desi cortex a53 suporta TZ, boardul de pe RP Zero 2Pi nu are suport hardware (magistrale etc) pentru TZ "real".
 - ## Hardware Overlook
 Sistem complex de alegere a celei mai performante camere disponibile conectate la placuta folosind API-ul v4l2 (Video4Linux2) si apeluri IOCTL catre kernel pentru interogarea capabilitatilor fiecarei camere gasite.
 - ## Smart Image Capturing 
